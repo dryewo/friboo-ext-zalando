@@ -5,49 +5,47 @@
             [clj-time.core :as time]
             [clj-time.format :as time-format]
             [org.zalando.stups.friboo.log :as log]
-            [org.zalando.stups.friboo.zalando-internal.utils :as utils])
+            [org.zalando.stups.friboo.zalando-internal.utils :as utils]
+            [org.zalando.stups.friboo.zalando-internal.system.audit-logger :refer [AuditLogger]]
+            [clojure.string :as str])
   (:import (java.io ByteArrayInputStream)))
 
-(defn log
-  [config event]
-  (let [body           (json/encode event)
-        id             (utils/digest body)
-        bucket         (:bucket config)
-        content-length (count body)
-        key            (time-format/unparse (:formatter config) (time/now))
-        input-stream   (new ByteArrayInputStream (.getBytes body "UTF-8"))]
-    (future
-      (try
-        (s3/put-object
-          :bucket-name bucket
-          :key (utils/conpath key id)
-          :metadata {:content-length content-length
-                     :content-type   "application/json"}
-          :input-stream input-stream)
-        (log/info "Wrote audit event with id %s" id)
-        (catch Exception e
-          (log/error e "Could not write audit event: %s" body))))))
+(defn log-impl [{:keys [configuration]} event]
+  (let [s3-bucket (:s3-bucket configuration)
+        body   (json/encode event)]
+    (if (str/blank? s3-bucket)
+      (log/warn ":s3-bucket is not set, not sending Audit Event: %s" body)
+      (let [id            (utils/digest body)
+            format-string (or (:s3-bucket-key configuration) "yyyy/MM/dd/")
+            formatter     (time-format/formatter format-string time/utc)
+            key           (time-format/unparse formatter (time/now))
+            input-stream  (new ByteArrayInputStream (.getBytes body "UTF-8"))]
+        (future
+          (try
+            (s3/put-object {:bucket-name  s3-bucket
+                            :key          (utils/conpath key id)
+                            :metadata     {:content-length (count body)
+                                           :content-type   "application/json"}
+                            :input-stream input-stream})
+            (log/info "Wrote audit event with id %s" id)
+            (catch Exception e
+              (log/error e "Could not write audit event: %s" body))))))))
 
-(defn logger-factory
-  [config]
-  (let [bucket        (:s3-bucket config)
-        format-string (or (:s3-bucket-key config) "yyyy/MM/dd/")
-        formatter     (time-format/formatter format-string time/utc)]
-    (partial log {:bucket    bucket
-                  :formatter formatter})))
+(defn start-component [{:as this :keys [configuration]}]
+  (log/info "Starting S3 audit logger")
+  (when-not (:s3-bucket configuration)
+    (log/warn ":s3-bucket is not set, will not send Audit Events."))
+  this)
 
-(defrecord S3
-  [configuration]
+(defrecord S3 [;; Initial params - set in the constructor
+               configuration]
   component/Lifecycle
-  (start
-    [this]
-    (if (:log-fn this)
-      (do
-        (log/info "S3 audit logger already running")
-        this)
-      (do
-        (log/info "Starting S3 audit logger")
-        (assoc this :log-fn (logger-factory configuration)))))
-  (stop
-    [this]
-    (dissoc this :log-fn)))
+  (start [this]
+    (start-component this))
+  (stop [this]
+    (log/info "Shutting down S3 audit logger")
+    this)
+
+  AuditLogger
+  (log [this event]
+    (log-impl this event)))
