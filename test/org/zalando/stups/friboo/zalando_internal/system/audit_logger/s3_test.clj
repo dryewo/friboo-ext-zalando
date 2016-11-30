@@ -3,35 +3,40 @@
             [clojure.test :refer [deftest]]
             [amazonica.aws.s3 :as s3]
             [clj-time.format :as tf]
+            [org.zalando.stups.friboo.zalando-internal.test-utils :refer :all]
             [org.zalando.stups.friboo.zalando-internal.utils :as utils]
-            [org.zalando.stups.friboo.zalando-internal.system.audit-logger.s3 :as logger]))
+            [org.zalando.stups.friboo.zalando-internal.system.audit-logger :as logger]
+            [org.zalando.stups.friboo.zalando-internal.system.audit-logger.s3 :as s3-logger]))
 
 (deftest test-s3-logger
-  (facts "S3 logger"
-    (let [log-fn (logger/logger-factory {:s3-bucket .bucket-name.})]
-      (fact "log function calls s3/put-object with provided bucket"
-        (deref (log-fn {})) => nil
+
+  (facts "when :s3-bucket is not set, does nothing, but writes a log warning"
+    (with-comp [logger-comp (s3-logger/map->S3 {:configuration {}})]
+      (fact "does not make S3 API calls"
+        (logger/log logger-comp {}) => anything
         (provided
-          (tf/unparse irrelevant irrelevant) => "/path/to/file/"
+          (clojure.tools.logging/log* anything :warn anything
+                                      ":s3-bucket is not set, not sending Audit Event: [\"{}\"]") => nil
+          (s3/put-object anything) => anything :times 0))))
+
+  (facts "when :s3-bucket is set, works"
+    (with-comp [logger-comp (s3-logger/map->S3 {:configuration {:s3-bucket "foo-bar"}})]
+      (fact "log function calls S3 API"
+        (deref (logger/log logger-comp {})) => nil
+        (provided
+          (tf/unparse anything anything) => "/path/to/file/"
           (utils/digest "{}") => "sha256"
-          (s3/put-object
-            :bucket-name .bucket-name.
-            :key "/path/to/file/sha256"
-            :metadata {:content-length 2
-                       :content-type   "application/json"}
-            :input-stream irrelevant) => nil))
-      (fact "log-factory creates single-arity function"
-        (log-fn irrelevant irrelevant) => (throws Exception))
-      (fact "log logs to stdout if s3 call fails"
-        (deref (log-fn {})) => nil
+          (s3/put-object (just {:bucket-name  "foo-bar"
+                                :key          "/path/to/file/sha256"
+                                :metadata     {:content-length 2
+                                               :content-type   "application/json"}
+                                :input-stream anything})) => anything))
+      (fact "log logs to stdout if S3 API call fails"
+        (deref (logger/log logger-comp {})) => nil
         (provided
-          (tf/unparse irrelevant irrelevant) => "/path/to/file/"
           (utils/digest "{}") => "sha256"
           ; this is what friboo.log/error ultimately expands to
           (clojure.tools.logging/log* irrelevant :error irrelevant "Could not write audit event: [\"{}\"]") => nil :times 1
-          (s3/put-object
-            :bucket-name .bucket-name.
-            :key "/path/to/file/sha256"
-            :metadata {:content-length 2
-                       :content-type   "application/json"}
-            :input-stream irrelevant) =throws=> (new Exception "400 Bad Request"))))))
+          (s3/put-object anything) =throws=> (new Exception "400 Bad Request")))))
+
+  )
