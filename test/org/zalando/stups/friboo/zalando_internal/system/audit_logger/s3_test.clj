@@ -13,7 +13,7 @@
   (facts "when :s3-bucket is not set, does nothing, but writes a log warning"
     (with-comp [logger-comp (s3-logger/map->S3 {:configuration {}})]
       (fact "does not make S3 API calls"
-        (logger/log logger-comp {}) => anything
+        (deref (logger/log logger-comp {})) => anything
         (provided
           (clojure.tools.logging/log* anything :warn anything
                                       ":s3-bucket is not set, not sending Audit Event: [\"{}\"]") => nil
@@ -22,7 +22,7 @@
   (facts "when :s3-bucket is set, works"
     (with-comp [logger-comp (s3-logger/map->S3 {:configuration {:s3-bucket "foo-bar"}})]
       (fact "log function calls S3 API"
-        (deref (logger/log logger-comp {})) => nil
+        (deref (logger/log logger-comp {})) => .result.
         (provided
           (tf/unparse anything anything) => "/path/to/file/"
           (utils/digest "{}") => "sha256"
@@ -30,7 +30,7 @@
                                 :key          "/path/to/file/sha256"
                                 :metadata     {:content-length 2
                                                :content-type   "application/json"}
-                                :input-stream anything})) => anything))
+                                :input-stream anything})) => .result.))
       (fact "log logs to stdout if S3 API call fails"
         (deref (logger/log logger-comp {})) => nil
         (provided
