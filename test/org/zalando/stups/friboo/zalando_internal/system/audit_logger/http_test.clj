@@ -13,7 +13,7 @@
   (facts "when :api-url is not set, does nothing, but writes a log warning"
     (with-comp [logger-comp (http-logger/map->HTTP {:configuration {}})]
       (fact "does not make HTTP requests"
-        (logger/log logger-comp {}) => anything
+        (deref (logger/log logger-comp {})) => anything
         (provided
           (clojure.tools.logging/log* anything :warn anything ":api-url is not set, not sending Audit Event: [\"{}\"]") => nil
           (oauth2/access-token anything anything) => anything :times 0
@@ -23,13 +23,13 @@
     (with-comp [logger-comp (http-logger/map->HTTP {:configuration {:api-url "http://foo.bar"}
                                                     :tokens        .tokens.})]
       (fact "log function calls clj-http with provided url"
-        (deref (logger/log logger-comp {})) => nil
+        (deref (logger/log logger-comp {})) => .result.
         (provided
           (utils/digest "{}") => "sha256"
           (oauth2/access-token :http-audit-logger .tokens.) => .token.
           (http/put "http://foo.bar/sha256" (contains {:body         "{}"
                                                        :oauth-token  .token.
-                                                       :content-type :json})) => nil))
+                                                       :content-type :json})) => .result.))
       (fact "log logs to stdout if http call fails"
         (deref (logger/log logger-comp {})) => nil
         (provided

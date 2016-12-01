@@ -12,17 +12,19 @@
   (let [api-url (:api-url configuration)
         body    (json/encode event)]
     (if (str/blank? api-url)
-      (log/warn ":api-url is not set, not sending Audit Event: %s" body)
+      (do (log/warn ":api-url is not set, not sending Audit Event: %s" body)
+          (delay))
       (let [token-name   (or (:token-name configuration) :http-audit-logger)
             id           (utils/digest body)
             url          (utils/conpath api-url id)
             access-token (oauth2/access-token token-name tokens)]
         (future
           (try
-            (http/put url {:body         body
-                           :oauth-token  access-token
-                           :content-type :json})
-            (log/info "Wrote audit event with id %s" id)
+            (let [result (http/put url {:body         body
+                                        :oauth-token  access-token
+                                        :content-type :json})]
+              (log/info "Wrote audit event with id %s" id)
+              result)
             (catch Exception e
               ; log to console as fallback
               (log/error e "Could not write audit event: %s" body))))))))

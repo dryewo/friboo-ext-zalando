@@ -12,9 +12,10 @@
 
 (defn log-impl [{:keys [configuration]} event]
   (let [s3-bucket (:s3-bucket configuration)
-        body   (json/encode event)]
+        body      (json/encode event)]
     (if (str/blank? s3-bucket)
-      (log/warn ":s3-bucket is not set, not sending Audit Event: %s" body)
+      (do (log/warn ":s3-bucket is not set, not sending Audit Event: %s" body)
+          (delay))
       (let [id            (utils/digest body)
             format-string (or (:s3-bucket-key configuration) "yyyy/MM/dd/")
             formatter     (time-format/formatter format-string time/utc)
@@ -22,12 +23,13 @@
             input-stream  (new ByteArrayInputStream (.getBytes body "UTF-8"))]
         (future
           (try
-            (s3/put-object {:bucket-name  s3-bucket
-                            :key          (utils/conpath key id)
-                            :metadata     {:content-length (count body)
-                                           :content-type   "application/json"}
-                            :input-stream input-stream})
-            (log/info "Wrote audit event with id %s" id)
+            (let [result (s3/put-object {:bucket-name  s3-bucket
+                                         :key          (utils/conpath key id)
+                                         :metadata     {:content-length (count body)
+                                                        :content-type   "application/json"}
+                                         :input-stream input-stream})]
+              (log/info "Wrote audit event with id %s" id)
+              result)
             (catch Exception e
               (log/error e "Could not write audit event: %s" body))))))))
 
