@@ -1,4 +1,4 @@
-(ns org.zalando.stups.friboo.zalando-internal.auth
+(ns org.zalando.stups.friboo.zalando-internal.system.auth
   (:require [clj-http.client :as http]
             [org.zalando.stups.friboo.config :refer [require-config]]
             [org.zalando.stups.friboo.zalando-internal.utils :as utils]

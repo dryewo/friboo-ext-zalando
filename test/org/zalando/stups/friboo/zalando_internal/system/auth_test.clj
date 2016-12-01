@@ -1,8 +1,8 @@
-(ns org.zalando.stups.friboo.zalando-internal.auth-test
+(ns org.zalando.stups.friboo.zalando-internal.system.auth-test
   (:require
     [clj-http.client :as http]
     [org.zalando.stups.friboo.zalando-internal.test-utils :refer :all]
-    [org.zalando.stups.friboo.zalando-internal.auth :refer :all]
+    [org.zalando.stups.friboo.zalando-internal.system.auth :refer :all]
     [clojure.test :refer :all]
     [midje.sweet :refer :all]))
 

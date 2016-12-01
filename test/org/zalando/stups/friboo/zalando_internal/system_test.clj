@@ -8,7 +8,7 @@
             [org.zalando.stups.friboo.system.metrics :as metrics]
             [org.zalando.stups.friboo.system :as system]
             [clj-http.client :as client]
-            [org.zalando.stups.friboo.zalando-internal.auth :as auth]
+            [org.zalando.stups.friboo.zalando-internal.system.auth :as auth]
             [org.zalando.stups.friboo.system.mgmt-http :as mgmt-http]
             [org.zalando.stups.friboo.zalando-internal.system.oauth2 :as oauth2]
             [org.zalando.stups.friboo.zalando-internal.system.audit-logger.http :as audit-http]))
