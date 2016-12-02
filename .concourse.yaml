@@ -1,0 +1,18 @@
+---
+platform: linux
+image_resource:
+  type: docker-image
+  source:
+    repository: clojure
+    tag: alpine
+
+inputs:
+- name: git-repo
+
+run:
+  path: sh
+  args:
+  - -xuec
+  - |
+    cd git-repo
+    lein cloverage
