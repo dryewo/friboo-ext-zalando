@@ -9,6 +9,7 @@ image_resource:
 inputs:
 - name: git-repo
 
+# this should fail becaluse of no db
 run:
   path: sh
   args:
